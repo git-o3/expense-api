@@ -37,9 +37,10 @@ export const updateExpenseSchema = Joi.object({
 }).min(1);
 
 export const expenseQuerySchema = Joi.object({
-    filter: Joi.string()
-        .valid("past_week", "past_month", "last_3_months", "custom")
-        .default("past_month"),
-    startDate: Joi.date().iso().when("filter", { is: "custom", then: Joi.required() }),
-    endDate: Joi.date().iso().when("filter", { is: "custom", then: Joi.required() })
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+    search: Joi.string().allow('', null).trim(),
+    filter: Joi.string().valid("past_week", "past_month", "last_3_months", "custom"),
+    startDate: Joi.date().iso(),
+    endDate: Joi.date().iso()
 });

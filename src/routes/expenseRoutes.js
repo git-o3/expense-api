@@ -3,7 +3,9 @@ import {
     createExpense,
     getExpenses,
     updateExpense,
-    deleteExpense
+    deleteExpense,
+    getStats,
+    exportExpenses
 } from "../controllers/expenseController.js";
 import validate from "../validators/index.js";
 import { protect } from "../auth/auth.js";
@@ -21,6 +23,9 @@ router.use(protect)
 router.route("/")
     .get(validate(expenseQuerySchema, "query"), getExpenses)
     .post(validate(createExpenseSchema, "body"), createExpense)
+
+router.get("/stats", getStats)
+router.get("/export", exportExpenses)
  
 router.route("/:id")
     .put(validate(updateExpenseSchema), updateExpense)

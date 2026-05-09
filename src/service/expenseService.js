@@ -1,4 +1,5 @@
 import Expense from "../models/expense.js";
+import mongoose from "mongoose";
 
 /**
  * private helper: handles the brain of the date filtering
@@ -34,7 +35,7 @@ const calculateDateQuery = (filter, customRange = {}) => {
 
         default:
             return {}; // returns all expenses if no filter is provided
-    }
+    };
 }
 
 const ExpenseService = {
@@ -50,19 +51,54 @@ const ExpenseService = {
             // model handles the enum validation for category name
         })
 
-        return await newExpense.save()
+        return await newExpense.save();
     },
 
-    async getUserExpenses(userId, filter, customRange) {
-        const dateQuery = calculateDateQuery(filter, customRange);
+    async getUserExpenses(userId, queryOptions) {
+        const {
+            filter,
+            startDate,
+            endDate,
+            search,
+            page = 1,
+            limit = 10
+        } = queryOptions;
+
+        // build date query using customRange (startDate/endDate)
+        const dateQuery = calculateDateQuery(filter, { startDate, endDate});
 
         const query = { userId };
+
+        // apply date filter if exists
         if (Object.keys(dateQuery).length > 0) {
             query.date = dateQuery;
         }
 
-        // sort by date descending (newest first) for a dashboard view
-        return await Expense.find(query).sort({ date: -1 });
+        // search functionality (Regex for "note")
+        if (search) {
+            query.note = { $regex: search, $options: "i" };
+        }
+
+        // execution qeury with pagination 
+        const skip = (page - 1) * limit;
+
+        const expenses = await Expense.find(query)
+            .sort({ date: -1 }) // newest first
+            .skip(skip)
+            .limit(Number(limit));
+
+        // get total count for frontend pagination metadata
+        const total = await Expense.countDocuments(query);
+
+        return {
+            expenses,
+            pagination: {
+                total,
+                page: Number(page),
+                pages: Math.ceil(total / limit)
+            }
+        };
+
     },
 
 
@@ -87,6 +123,38 @@ const ExpenseService = {
 
         return { message: "Expense deleted successfully"};
     },
+
+    async getExpenseStats(userId) {
+        const stats = await Expense.aggregate([
+            // filter by user to leverage the index
+            {
+                $match: { userId: new mongoose.Types.ObjectId(userId) }
+            },
+            
+            // group by category name and sum the amounts
+            {
+                $group: {
+                    _id: "$category.name",
+                    totalAmount: { $sum: "$amount"},
+                    count: { $sum: 1 }, // number of transactions in the category
+                    avgSpending: { $avg: "$amount" }
+                }
+            },
+
+            // sort by highest spending first
+            {
+                $sort: { totalAmount: -1 }
+            }
+        ])
+
+        return stats;
+    },
+
+    // export logic: fetch all data without pagination
+    async getRawExpensesForExport(userId) {
+        return await Expense.find({ userId }).sort({ date: -1}).lean();
+    }
+  
 };
 
 export default ExpenseService;

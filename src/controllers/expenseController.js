@@ -26,8 +26,11 @@ export const getExpenses = asyncHandler(async (req, res) => {
     // hand off the filtering logic to the service
     const expenses = await ExpenseService.getUserExpenses(
         req.user.id,
-        filter,
-        { startDate, endDate }
+        {
+            filter,
+            startDate,
+            endDate
+        }
     );
 
     res.status(200).json({
@@ -65,4 +68,37 @@ export const deleteExpense = asyncHandler(async (req, res) => {
         success: true,
         data: result
     });
+});
+
+/**
+ * stats for expense
+ * @route GET /api/v1/expenses/stats
+ */
+export const getStats = asyncHandler(async (req, res) => {
+    const stats = await ExpenseService.getExpenseStats(req.user.id);
+
+    res.status(200).json({
+        success: true,
+        data: stats
+    });
+});
+
+/**
+ * export for expense
+ * @route GET  /api/v1/expenses/export
+ */
+export const exportExpenses = asyncHandler(async (req, res) => {
+    const expenses = await ExpenseService.getRawExpensesForExport(req.user.id);
+
+    // csv construction
+    const header = "Date,Category,Amount,Note\n";
+    const rows = expenses.map(ex =>
+        `${ex.date.toISOString()},${ex.category.name},${ex.amount},"${ex.note || ""}"`
+    ).join("\n");
+
+    const csv = header + rows;
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", "attachment; filename=expenses.csv");
+    res.status(200).send(csv);
 });
